@@ -1,23 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
+import { ApiClient } from '../../api/lib/client';
+import { expectStatusOk } from '../../api/lib/expect';
 
-test('PATCH /payment_details/{paymentDetailsId}/attemptRestrictions - Sets attempt restrictions on user payment details', async ({ request, baseURL }) => {
-  if (!baseURL) throw new Error('baseURL is not set');
-
-  const authHeader = process.env.AUTH_HEADER;
-  const urlPath = `/payment_details/${process.env["PATH_PAYMENTDETAILSID"] || "REPLACE_PAYMENTDETAILSID"}/attemptRestrictions`;
-  const url = new URL(urlPath, baseURL).toString();
-
-  const headers: Record<string, string> = {};
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
+test('PATCH /payment_details/{paymentDetailsId}/attemptRestrictions - Sets attempt restrictions on user payment details', async () => {
+  const baseURL = process.env.BASE_URL || process.env.PW_BASE_URL || 'http://localhost:3000';
+  const client = new ApiClient({ baseURL, authHeader: process.env.AUTH_HEADER });
+  await client.init();
+  try {
+    const templatePath = '/payment_details/{paymentDetailsId}/attemptRestrictions';
+    const resolvedPath = client.resolvePathParams(templatePath);
+    // TODO: Provide query/body if required by schema
+    const res = await client.send('PATCH', resolvedPath);
+    await expectStatusOk(res, 'PATCH /payment_details/{paymentDetailsId}/attemptRestrictions');
+  } finally {
+    await client.dispose();
   }
-
-  // TODO: Provide query/body if required by schema
-  const response = await request.patch(url, {
-    headers,
-  });
-
-  // Basic assertions. Adjust per endpoint contract.
-  expect(response.status(), 'HTTP status should be 2xx/3xx').toBeGreaterThanOrEqual(200);
-  expect(response.status(), 'HTTP status should be < 400').toBeLessThan(400);
 });

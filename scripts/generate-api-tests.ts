@@ -39,43 +39,30 @@ function getDefaultServerUrl(schema: OpenAPISchema): string | undefined {
   return schema.servers && schema.servers.length > 0 ? schema.servers[0].url : undefined;
 }
 
-function generateTestFileContent(
-  method: string,
-  pathPattern: string,
-  operation: any,
-): string {
+function generateTestFileContent(method: string, pathPattern: string, operation: any): string {
   const title = buildTestTitle(method, pathPattern, operation?.summary);
   const hasPathParams = /\{[^}]+\}/.test(pathPattern);
-  const pathParamHints = (pathPattern.match(/\{([^}]+)\}/g) || []).map((x) => x.replace(/[{}]/g, ''));
-  const resolvedPathExpr = hasPathParams
-    ? '`' + pathPattern.replace(/\{([^}]+)\}/g, (_m, p1) => `\${process.env["PATH_${String(p1).toUpperCase()}"] || "REPLACE_${String(p1).toUpperCase()}"}`) + '`'
-    : `'${pathPattern}'`;
+  const pathParamNames = (pathPattern.match(/\{([^}]+)\}/g) || []).map((x) => x.replace(/[{}]/g, ''));
 
   const securityComment = operation?.security ? ' // security: ' + JSON.stringify(operation.security) : '';
-  const authSnippet = `const authHeader = process.env.AUTH_HEADER;`;
 
-  return `import { test, expect } from '@playwright/test';
+  return `import { test } from '@playwright/test';
+import { ApiClient } from '../../api/lib/client';
+import { expectStatusOk } from '../../api/lib/expect';
 
-test('${title.replace(/'/g, "\\'")}', async ({ request, baseURL }) => {
-  if (!baseURL) throw new Error('baseURL is not set');
-
-  ${authSnippet}
-  const urlPath = ${resolvedPathExpr};
-  const url = new URL(urlPath, baseURL).toString();
-
-  const headers: Record<string, string> = {};
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
+test('${title.replace(/'/g, "\\'")}', async () => {
+  const baseURL = process.env.BASE_URL || process.env.PW_BASE_URL || 'http://localhost:3000';
+  const client = new ApiClient({ baseURL, authHeader: process.env.AUTH_HEADER });
+  await client.init();
+  try {
+    const templatePath = '${pathPattern.replace(/'/g, "\\'")}';
+    const resolvedPath = client.resolvePathParams(templatePath);
+    // TODO: Provide query/body if required by schema${securityComment}
+    const res = await client.send('${method.toUpperCase()}', resolvedPath);
+    await expectStatusOk(res, '${method.toUpperCase()} ${pathPattern.replace(/'/g, "\\'")}');
+  } finally {
+    await client.dispose();
   }
-
-  // TODO: Provide query/body if required by schema${securityComment}
-  const response = await request.${method}(url, {
-    headers,
-  });
-
-  // Basic assertions. Adjust per endpoint contract.
-  expect(response.status(), 'HTTP status should be 2xx/3xx').toBeGreaterThanOrEqual(200);
-  expect(response.status(), 'HTTP status should be < 400').toBeLessThan(400);
 });
 `;
 }

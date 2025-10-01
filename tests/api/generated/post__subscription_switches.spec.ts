@@ -1,23 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
+import { ApiClient } from '../../api/lib/client';
+import { expectStatusOk } from '../../api/lib/expect';
 
-test('POST /subscription_switches - Request subscription switch', async ({ request, baseURL }) => {
-  if (!baseURL) throw new Error('baseURL is not set');
-
-  const authHeader = process.env.AUTH_HEADER;
-  const urlPath = '/subscription_switches';
-  const url = new URL(urlPath, baseURL).toString();
-
-  const headers: Record<string, string> = {};
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
+test('POST /subscription_switches - Request subscription switch', async () => {
+  const baseURL = process.env.BASE_URL || process.env.PW_BASE_URL || 'http://localhost:3000';
+  const client = new ApiClient({ baseURL, authHeader: process.env.AUTH_HEADER });
+  await client.init();
+  try {
+    const templatePath = '/subscription_switches';
+    const resolvedPath = client.resolvePathParams(templatePath);
+    // TODO: Provide query/body if required by schema
+    const res = await client.send('POST', resolvedPath);
+    await expectStatusOk(res, 'POST /subscription_switches');
+  } finally {
+    await client.dispose();
   }
-
-  // TODO: Provide query/body if required by schema
-  const response = await request.post(url, {
-    headers,
-  });
-
-  // Basic assertions. Adjust per endpoint contract.
-  expect(response.status(), 'HTTP status should be 2xx/3xx').toBeGreaterThanOrEqual(200);
-  expect(response.status(), 'HTTP status should be < 400').toBeLessThan(400);
 });

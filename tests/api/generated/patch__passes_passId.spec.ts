@@ -1,23 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
+import { ApiClient } from '../../api/lib/client';
+import { expectStatusOk } from '../../api/lib/expect';
 
-test('PATCH /passes/{passId} - Update a pass', async ({ request, baseURL }) => {
-  if (!baseURL) throw new Error('baseURL is not set');
-
-  const authHeader = process.env.AUTH_HEADER;
-  const urlPath = `/passes/${process.env["PATH_PASSID"] || "REPLACE_PASSID"}`;
-  const url = new URL(urlPath, baseURL).toString();
-
-  const headers: Record<string, string> = {};
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
+test('PATCH /passes/{passId} - Update a pass', async () => {
+  const baseURL = process.env.BASE_URL || process.env.PW_BASE_URL || 'http://localhost:3000';
+  const client = new ApiClient({ baseURL, authHeader: process.env.AUTH_HEADER });
+  await client.init();
+  try {
+    const templatePath = '/passes/{passId}';
+    const resolvedPath = client.resolvePathParams(templatePath);
+    // TODO: Provide query/body if required by schema
+    const res = await client.send('PATCH', resolvedPath);
+    await expectStatusOk(res, 'PATCH /passes/{passId}');
+  } finally {
+    await client.dispose();
   }
-
-  // TODO: Provide query/body if required by schema
-  const response = await request.patch(url, {
-    headers,
-  });
-
-  // Basic assertions. Adjust per endpoint contract.
-  expect(response.status(), 'HTTP status should be 2xx/3xx').toBeGreaterThanOrEqual(200);
-  expect(response.status(), 'HTTP status should be < 400').toBeLessThan(400);
 });
