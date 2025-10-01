@@ -1,0 +1,3792 @@
+openapi: 3.0.3
+info:
+  title: API 3.1
+  description: Description of Cleeng's API 3.1
+  version: 0.0.2
+externalDocs:
+  description: Find out more about Cleeng API
+  url: https://developers.cleeng.com/reference/apireference-overview
+servers:
+  - url: https://api.cleeng.com/3.1
+    description: Production server (uses live data)
+  - url: https://api.sandbox.cleeng.com/3.1
+    description: Sandbox server (uses test data)
+tags:
+  - name: Payment details
+  - name: Subscriptions
+  - name: Passes
+  - name: Campaigns & coupons
+  - name: Payments
+  - name: Pause
+  - name: Publisher's payment method settings
+  - name: Offers
+paths:
+  /payment_details/{paymentDetailsId}/attemptRestrictions:
+    patch:
+      tags:
+        - Payment details
+      summary: Sets attempt restrictions on user payment details
+      parameters:
+        - $ref: '#/components/parameters/paymentDetailsId'
+      requestBody:
+        description: Update payment details with restriction date and rejections count
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                attemptRestrictedTo:
+                  type: integer
+                  format: timestamp
+                  minimum: 0
+                  nullable: true
+                attemptRejections:
+                  type: object
+                  example:
+                    - "2023-02": 0
+                      "2023-03": 1
+                      "2023-04": 5
+                  additionalProperties:
+                    type: integer
+              oneOf:
+                - required: [ attemptRestrictedTo ]
+                - required: [ attemptRejections ]
+      responses:
+        200:
+          description: Successful payment details update
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetailResponse'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Example response for unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /campaigns:
+    get:
+      summary: List coupon campaigns
+      tags:
+        - Campaigns & coupons
+      parameters:
+        - $ref: '#/components/parameters/couponCode'
+      responses:
+        200:
+          description: Successful campaigns list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListCampaignsResponse'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions:
+    post:
+      tags:
+        - Subscriptions
+      summary: Create externally managed subscription
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  type: integer
+                  minimum: 100000000
+                  maximum: 999999999
+                offerId:
+                  $ref: '#/components/schemas/offerId'
+                expiresAt:
+                  type: integer
+                  nullable: false
+                  format: timestamp
+                  minimum: 1
+                  maximum: 99999999999
+                paymentMethodId:
+                  type: integer
+                  nullable: false
+                externalId:
+                  type: string
+                  description: Subscriptions external id
+                  maxLength: 120
+                inTrial:
+                  type: boolean
+                  nullable: false
+                  default: false
+                paymentId:
+                  type: integer
+                  nullable: false
+                externalProperties:
+                  type: object
+                  nullable: true
+                  description: Any properties about subscription
+              required: [ customerId, offerId, paymentMethodId, externalId ]
+      responses:
+        201:
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags:
+        - Subscriptions
+      summary: List subscriptions
+      parameters:
+        - in: query
+          name: transactionId
+          schema:
+            type: string
+            pattern: '^(T)([1-9][0-9]{8})$'
+        - in: query
+          name: customerId
+          schema:
+            type: integer
+            minimum: 100000000
+            maximum: 999999999
+          description: Customer id to filter
+        - in: query
+          name: offerId
+          schema:
+            type: string
+            pattern: '^[SPEAR]{1}[1-9]\d{8}_[A-Z0-9]{2}$'
+          description: Offer id to filter, required with customerId
+        - in: query
+          name: paymentMethodId
+          schema:
+            type: integer
+        - in: query
+          name: externalId
+          schema:
+            type: string
+          description: Subscription external id
+        - in: query
+          name: status
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - active
+                - stopped
+                - terminated
+          description: Subscription status
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+          description: Skip first X results
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Limit the amount of returned results
+      responses:
+        200:
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SubscriptionResource'
+                  message:
+                    type: string
+        400:
+          description: Failure response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: false
+                  data:
+                    type: array
+                    nullable: true
+                    default: null
+                  message:
+                    type: string
+
+  /subscription_switches:
+    post:
+      tags:
+        - Subscriptions
+      summary: Request subscription switch
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                toOfferId:
+                  $ref: '#/components/schemas/offerId'
+                switchDirection:
+                  $ref: '#/components/schemas/SwitchDirection'
+                algorithm:
+                  type: string
+                  enum: [ DEFERRED, IMMEDIATE_WITHOUT_PRORATION ]
+                  description: Allowed only for externally managed subscription
+                subscriptionId:
+                  $ref: '#/components/schemas/subscriptionId'
+                customerId:
+                  minimum: 100000000
+                  maximum: 9999999999
+                  deprecated: true
+                  description: Deprecated - This parameter will not be able to describe the subscription in the near future. Use `subscriptionId` instead.
+                fromOfferId:
+                  type: string
+                  pattern: '^[SPEAR]{1}[1-9]\d{8}_[A-Z]{2}$'
+                  deprecated: true
+                  description: Deprecated - This parameter will not be able to describe the subscription in the near future. Use `subscriptionId` instead.
+              required: [ toOfferId, switchDirection ]
+      responses:
+        200:
+          description: Switch requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SwitchResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{subscriptionId}:
+    patch:
+      tags:
+        - Subscriptions
+      summary: Updates subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - active
+                    - stopped
+                    - terminated
+                couponCode:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{2,40}$'
+                expiresAt:
+                  type: integer
+                  format: timestamp
+                  minimum: 1
+                  maximum: 99999999999
+                paymentDetailsId:
+                  type: integer
+                  minimum: 1
+                inTrial:
+                  type: boolean
+                externalProperties:
+                  type: object
+                  description: Any properties about subscription
+      responses:
+        200:
+          description: Update subscription response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: false
+                  subscription:
+                    $ref: '#/components/schemas/SubscriptionResource'
+                  message:
+                    type: string
+        400:
+          description: Bad request response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionFailureResponse'
+              example:
+                success: false
+                subscription: null
+                message: status value is invalid
+        403:
+          description: Access denied response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionFailureResponse'
+        404:
+          description: Not found response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionFailureResponse'
+              example:
+                success: false
+                subscription: null
+                message: Subscription with id 123456789 does not exists
+        422:
+          description: Unprocessable entity response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionFailureResponse'
+    get:
+      tags:
+        - Subscriptions
+      summary: Get subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      responses:
+        200:
+          description: Get subscription results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        400:
+          description: Input validation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{subscriptionId}/renew:
+    post:
+      tags:
+        - Subscriptions
+      summary: Renew an externally managed subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expiresAt:
+                  type: integer
+                  nullable: false
+                  format: timestamp
+                  minimum: 1
+                  maximum: 99999999999
+                paymentId:
+                  type: integer
+                  nullable: false
+                  minimum: 1
+                convertTrial:
+                  type: boolean
+                  default: false
+      responses:
+        200:
+          description: Subscription renewed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not found response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                subscription: null
+                message: "Subscription with id: 123456789 not found"
+        422:
+          description: Unprocessable entity response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /subscriptions/{subscriptionId}/revive:
+    post:
+      tags:
+        - Subscriptions
+      summary: Revives subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expirationDate:
+                  type: integer
+                  nullable: false
+                  format: timestamp
+                  minimum: 1
+                  maximum: 99999999999
+              required: [ expirationDate ]
+      responses:
+        200:
+          description: Subscription revived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not found response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                subscription: null
+                message: "Could not find subscription"
+        403:
+          description: Access denied response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                subscription: null
+                message: "Access denied"
+        422:
+          description: Unprocessable entity response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /subscriptions/{subscriptionId}/transfer:
+    post:
+      tags:
+        - Subscriptions
+      summary: Transfer subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  type: integer
+                  nullable: false
+                  minimum: 100000000
+                  maximum: 9999999999
+              required:
+                - customerId
+      responses:
+        200:
+          description: Subscription transferred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not found response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                subscription: null
+                message: "Subscription with id: 123456789 not found"
+        422:
+          description: Unprocessable entity response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /subscriptions/{subscriptionId}/cancel:
+    post:
+      tags:
+        - Subscriptions
+      summary: Cancel subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cancellationReason:
+                  type: string
+                  minLength: 1
+                  maxLength: 512
+              required:
+                - cancellationReason
+      responses:
+        200:
+          description: Subscription cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        404:
+          description: Not found response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                subscription: null
+                message: "Subscription with id: 123456789 not found"
+        422:
+          description: Validation error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /subscriptions/{subscriptionId}/terminate:
+    post:
+      tags:
+        - Subscriptions
+      summary: Terminate subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                terminationType:
+                  type: string
+                  enum:
+                    - paymentCancel
+                    - userCancel
+                    - publisherCancel
+              required:
+                - terminationType
+      responses:
+        200:
+          description: Subscription terminated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        404:
+          description: Not found response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                subscription: null
+                message: "Subscription with id: 123456789 not found"
+        422:
+          description: Validation error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /subscriptions/{subscriptionId}/activate:
+    post:
+      tags:
+        - Subscriptions
+      summary: Activate subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      responses:
+        200:
+          description: Subscription activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        404:
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        400:
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Subscription cannot be activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /subscriptions/{subscriptionId}/pause:
+    post:
+      tags:
+        - Subscriptions
+        - Pause
+      summary: Pause subscription
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pauseDate:
+                  type: string
+                  oneOf:
+                    - enum:
+                        - anniversary-date
+                resumesAfterBillingCycles:
+                  type: integer
+                  minimum: 1
+              required:
+                - pauseDate
+                - resumesAfterBillingCycles
+      responses:
+        200:
+          description: Paused subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        404:
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "Subscription with id: 123456789 not found"
+        400:
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                message: "Maximum limit of allowed billing cycles exceeded"
+        422:
+          description: Subscription cannot be paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /subscriptions/{subscriptionId}/resume:
+    post:
+      summary: Resumes subscription from scheduled pause
+      tags:
+        - Pause
+      parameters:
+        - in: path
+          name: subscriptionId
+          required: true
+          schema:
+            $ref: '#/components/schemas/subscriptionId'
+          description: Subscription id
+      requestBody:
+        content:
+          application/json: { }
+      responses:
+        202:
+          description: Subscription resumed from scheduled pause
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionResource'
+        404:
+          description: Subscription not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        400:
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Subscription cannot be resumed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /passes/{passId}:
+    get:
+      summary: Get pass
+      description: This endpoint allows to get pass resource using id.
+      tags:
+        - Passes
+      parameters:
+        - in: path
+          name: passId
+          required: true
+          schema:
+            $ref: '#/components/schemas/passId'
+          description: Pass id
+      responses:
+        200:
+          description: Get pass results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassResource'
+        400:
+          description: Input validation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Pass not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Update a pass
+      description: This endpoint allows to update pass using id.
+      tags:
+        - Passes
+      parameters:
+        - in: path
+          name: passId
+          required: true
+          schema:
+            $ref: '#/components/schemas/passId'
+          description: Pass id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                externalProperties:
+                  type: object
+                  nullable: false
+                  description: Any properties about pass
+                expiresAt:
+                  type: integer
+                  nullable: true
+                  format: timestamp
+                  minimum: 1
+                  maximum: 99999999999
+                  description: Timestamp of expiration date. If null is passed then the pass will be evergreen
+      responses:
+        200:
+          description: Pass updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Pass not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /passes:
+    get:
+      tags:
+        - Passes
+      summary: List passes
+      parameters:
+        - in: query
+          name: transactionId
+          schema:
+            type: string
+            pattern: '^(T)([1-9][0-9]{8})$'
+        - in: query
+          name: customerId
+          schema:
+            type: integer
+            minimum: 100000000
+            maximum: 999999999
+          description: Customer id to filter
+        - in: query
+          name: offerId
+          schema:
+            type: string
+            pattern: '^P[1-9]\d{8}_[A-Z0-9]{2}$'
+          description: Offer id to filter, required with customerId
+        - in: query
+          name: paymentMethodId
+          schema:
+            type: integer
+        - in: query
+          name: externalId
+          schema:
+            type: string
+          description: Pass external id
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+          description: Skip first X results
+      responses:
+        200:
+          description: Returns list of fetched passes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PassResource'
+        400:
+          description: Search failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - Passes
+      summary: Create externally managed pass
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  type: integer
+                  minimum: 100000000
+                  maximum: 999999999
+                offerId:
+                  $ref: '#/components/schemas/offerId'
+                expiresAt:
+                  type: integer
+                  nullable: true
+                  format: timestamp
+                  minimum: 1
+                  maximum: 99999999999
+                  description: When expiration timestamp is not provided, the pass will be created with the expiration date calculated based on the offer's
+                paymentMethodId:
+                  type: integer
+                  nullable: false
+                externalId:
+                  type: string
+                  description: Pass external identifier
+                  maxLength: 120
+                paymentId:
+                  type: integer
+                  nullable: false
+                  description: Id of the payment that created the pass
+                externalProperties:
+                  type: object
+                  nullable: true
+                  description: Any properties about pass
+              required: [ customerId, offerId, paymentMethodId, externalId ]
+      responses:
+        201:
+          description: Pass created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /passes/{passId}/terminate:
+    post:
+      summary: Terminate a pass
+      description: This endpoint allows to terminate pass using id.
+      tags:
+        - Passes
+      parameters:
+        - in: path
+          name: passId
+          required: true
+          schema:
+            $ref: '#/components/schemas/passId'
+          description: Pass id
+      responses:
+        200:
+          description: Pass terminated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Pass not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /passes/{passId}/transfer:
+    post:
+      summary: Transfer a pass
+      description: This endpoint allows to transfer pass using id to another customer.
+      tags:
+        - Passes
+      parameters:
+        - in: path
+          name: passId
+          required: true
+          schema:
+            $ref: '#/components/schemas/passId'
+          description: Pass Id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  $ref: "#/components/schemas/customerId"
+              required: [ customerId ]
+      responses:
+        200:
+          description: Pass transferred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Pass not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Example response for unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /gifts/{giftId}:
+    get:
+      tags:
+        - Gifts
+      summary: Get gift
+      parameters:
+        - $ref: '#/components/parameters/giftId'
+      responses:
+        200:
+          description: Gift found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gift'
+        404:
+          description: Gift not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Gift not found.
+    patch:
+      tags:
+        - Gifts
+      summary: Update gift delivery details data
+      parameters:
+        - $ref: '#/components/parameters/giftId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deliveryDetails:
+                  $ref: '#/components/schemas/Gift_DeliveryDetails'
+      responses:
+        200:
+          description: Gift updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gift'
+        400:
+          description: Invalid data provided
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Personal note cannot exceed 255 characters.
+        404:
+          description: Gift not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Gift not found
+        409:
+          description: Gift is no longer updatable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Gift is not updatable
+
+  /gifts/{code}/verification:
+    get:
+      tags:
+        - Gifts
+      summary: Verify gift code
+      parameters:
+        - $ref: '#/components/parameters/giftCode'
+        - $ref: '#/components/parameters/customerIp'
+        - $ref: '#/components/parameters/redeemerId'
+      responses:
+        200:
+          description: Gift verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftVerificationResponseResource'
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not found response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Gift not found
+
+  /gifts/{code}/redeem:
+    post:
+      tags:
+        - Gifts
+      summary: Redeem gift code
+      parameters:
+        - $ref: '#/components/parameters/giftCode'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                redeemerId:
+                  $ref: '#/components/schemas/redeemerId'
+                customerIp:
+                  $ref: '#/components/schemas/customerIp'
+      responses:
+        200:
+          description: Gift redeemed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: OK
+        400:
+          description: Example response for invalid body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not found response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Gift not found
+        409:
+          description: Validation failure response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Gift is not redeemable. Refusal reason: <reason>"
+
+  /payments:
+    post:
+      tags:
+        - Payments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  $ref: '#/components/schemas/customerId'
+                status:
+                  type: string
+                  enum:
+                    - captured
+                    - rejected
+                offerId:
+                  $ref: '#/components/schemas/offerId'
+                paymentMethodId:
+                  type: integer
+                netAmount:
+                  type: number
+                  format: double
+                  nullable: false
+                taxAmount:
+                  type: number
+                  format: float
+                  nullable: true
+                currency:
+                  $ref: "#/components/schemas/CurrencyCode"
+                country:
+                  type: string
+                  pattern: '^\w{2}$'
+                  nullable: true
+                externalPaymentId:
+                  type: string
+                  nullable: false
+                  minLength: 1
+                rejectedReason:
+                  type: string
+                  nullable: false
+                subscriptionId:
+                  type: integer
+                  minimum: 100000000
+                  maximum: 9999999999
+                  nullable: true
+              required:
+                - customerId
+                - status
+                - offerId
+                - paymentMethodId
+                - netAmount
+                - taxAmount
+                - currency
+                - externalPaymentId
+      responses:
+        200:
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Payment created successfully
+                  payment:
+                    $ref: '#/components/schemas/PaymentResource'
+        400:
+          description: Payment not created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /customers/{customerId}:
+    get:
+      tags:
+        - Customer
+      summary: Get customer information
+      parameters:
+        - $ref: '#/components/parameters/customerId'
+      responses:
+        200:
+          description: Successfully retrieved customer information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerResponse'
+        400:
+          description: Invalid provided data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                data: null
+                success: false
+                message: "Invalid customerId format"
+        404:
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                data: null
+                success: false
+                message: "Customer not found"
+    patch:
+      tags:
+        - Customer
+      summary: Use this endpoint to update a customer's data, for example first name, last name.
+      parameters:
+        - $ref: '#/components/parameters/customerId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  $ref: '#/components/schemas/customerId'
+                firstName:
+                  type: string
+                  nullable: false
+                  maxLength: 50
+                lastName:
+                  type: string
+                  nullable: false
+                  maxLength: 50
+                email:
+                  type: string
+                  format: email
+                  nullable: false
+                country:
+                  type: string
+                  nullable: false
+                lastLoginDate:
+                  type: integer
+                  format: timestamp
+                  nullable: false
+                lastUserIp:
+                  type: string
+                  format: ipv4, ipv6
+                  nullable: false
+                currency:
+                  $ref: "#/components/schemas/CurrencyCode"
+                locale:
+                  type: string
+                  nullable: false
+                externalId:
+                  type: string
+                  nullable: false
+                externalData:
+                  type: object
+                  nullable: false
+                  # uncomment when validation error is readable for human
+      #                password:
+      #                  type: string
+      #                  minLength: 8
+      #                  maxLength: 80 # BCRYPT ONLY USES UP TO 72 CHARS
+      #                  pattern: '^((?=.*[a-zA-Z])(?=.*[0-9]))|((?=.*[a-zA-Z])(?=.*[!@#\$%\^&]))$'
+      #                  nullable: false
+
+      responses:
+        200:
+          description: TBA
+        400:
+          description: TBA
+        422:
+          description: TBA
+        # TODO: add rest of responses
+    delete:
+      tags:
+        - Customer
+      summary: Delete customer
+      parameters:
+        - $ref: '#/components/parameters/customerId'
+      responses:
+        200:
+          description: Successfully deleted customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: array
+                example:
+                  data: []
+                  success: true
+                  message: "User deleted successfully"
+                required:
+                  - success
+                  - message
+                  - data
+        400:
+          description: Invalid provided data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                data: []
+                success: false
+                message: "Invalid customerId format"
+        404:
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                data: null
+                success: false
+                message: "User does not exist or is also associated with other broadcasters"
+        422:
+          description: Customer cannot be deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                data: null
+                success: false
+                message: "User has an active subscription"
+
+  /customers/request_password_reset:
+    post:
+      tags:
+        - Customer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerId:
+                  $ref: '#/components/schemas/customerId'
+                customerEmail:
+                  type: string
+                  format: email
+                resetUrl:
+                  type: string
+                  format: uri
+                  nullable: false
+              required: [ resetUrl ]
+              oneOf:
+                - required: [ customerId ]
+                - required: [ customerEmail ]
+      responses:
+        200:
+          description: Successfully created password reset request
+        400:
+          description: Invalid data provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                message: "ResetUrl is invalid"
+        404:
+          description: Customer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                message: "Customer not found"
+
+  /payment_methods:
+    post:
+      summary: Create payment method
+      tags:
+        - Publisher's payment method settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source:
+                  type: string
+                  nullable: false
+                  minLength: 1
+                methodName:
+                  type: string
+                  nullable: false
+                  minLength: 1
+                paymentGateway:
+                  type: string
+                  nullable: false
+                  minLength: 1
+                feeRate:
+                  type: number
+                  format: double
+                  nullable: false
+                  default: 0.0
+                  minimum: 0.0
+                isExternalPayment:
+                  type: boolean
+                handler:
+                  type: string
+                  nullable: false
+                  minLength: 1
+                  default: external
+                gatewayParameters:
+                  type: object
+                  nullable: true
+                  default: null
+                  description: Any properties about gateway
+                paymentSupport:
+                  type: boolean
+                paymentAmountAccuracy:
+                  type: string
+                autoTerminate:
+                  type: boolean
+                  default: true
+
+              required:
+                - source
+                - methodName
+                - paymentGateway
+                - isExternalPayment
+                - paymentSupport
+                - paymentAmountAccuracy
+      responses:
+        200:
+          description: Payment method created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentMethodResource'
+        400:
+          description: Payment method not created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /offers/{offerID}:
+    patch:
+      summary: Update an Offer
+      tags:
+        - Offers
+      description: Updates specific fields of an existing offer.
+      parameters:
+        - name: offerID
+          in: path
+          required: true
+          description: The unique identifier of the offer to be updated.
+          schema:
+            $ref: "#/components/schemas/mainOfferId"
+
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: A JSON object containing the fields to update on the offer.
+              type: object
+              additionalProperties: false
+              minItems: 1
+              properties:
+                title:
+                  type: string
+                  example: Premium+
+                  minLength: 1
+                  maxLength: 255
+                description:
+                  type: string
+                  example: Best deal!
+                  maxLength: 255
+                tags:
+                  $ref: "#/components/schemas/OfferTags"
+                url:
+                  type: string
+                  nullable: true
+                  pattern: '^$|^(https?|ftp)://[^\s/?#\.\-][^\s/?#]*\.[^\s/?\.#-]{2,}/?[^\s]*$'
+                  example: https://example.com
+                  maxLength: 200
+                imageUrl:
+                  type: string
+                  nullable: true
+                  example: https://example.com/image.jpg
+                  maxLength: 255
+                price:
+                  type: object
+                  minItems: 1
+                  additionalProperties: false
+                  properties:
+                    amount:
+                      type: number
+                      format: float
+                      description: The default price for the offer.
+                      example: 10
+                      minimum: 0
+                    rules:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          from:
+                            type: integer
+                            format: int64
+                            description: The start date of the pricing rule (Unix timestamp).
+                            example: 1764590400
+                          to:
+                            type: integer
+                            format: int64
+                            description: The end date of the pricing rule (Unix timestamp).
+                            example: 1777636800
+                          name:
+                            type: string
+                            description: The name of the pricing rule.
+                            example: Early Bird
+                          amount:
+                            type: number
+                            format: float
+                            description: The price for this specific rule.
+                            example: 5
+                            exclusiveMinimum: 0
+                        required:
+                          - from
+                          - to
+                          - name
+                          - amount
+                geoRestriction:
+                  type: object
+                  nullable: true
+                  minItems: 1
+                  properties:
+                    type:
+                      type: string
+                      enum: [ whitelist, blacklist ]
+                      example: "whitelist"
+                      description: "The type of geo-restriction."
+                    countries:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/CountryCode"
+                      example: [ "NL" ]
+                      description: "A list of country codes (ISO 3166-1 alpha-2)."
+                entitlement:
+                  type: object
+                  minItems: 1
+                  properties:
+                    duration:
+                      type: object
+                      minItems: 1
+                      properties:
+                        amount:
+                          type: integer
+                          format: int32
+                          example: 1
+                          minimum: 0
+                        periodUnit:
+                          type: string
+                          enum: [ year, month, week, day, hour ]
+                          example: year
+                    expiresAt:
+                      type: integer
+                      format: int32
+                      description: A Unix timestamp indicating when the entitlement expires.
+                      example: 1777636800
+                event:
+                  type: object
+                  minItems: 1
+                  properties:
+                    timezone:
+                      type: string
+                      description: The timezone of the event (e.g., 'Europe/Amsterdam').
+                      example: Europe/Amsterdam
+                    startsAt:
+                      type: integer
+                      format: int32
+                      description: The start time of the event (Unix timestamp).
+                      example: 1764590400
+                    endsAt:
+                      type: integer
+                      format: int32
+                      description: The end time of the event (Unix timestamp).
+                      example: 1764597600
+                freeTrial:
+                  type: object
+                  minItems: 1
+                  nullable: true
+                  properties:
+                    type:
+                      type: string
+                      enum: [ day, period ]
+                      example: day
+                      description: "The unit of the free trial duration."
+                    duration:
+                      type: integer
+                      minimum: 0
+                      example: 7
+                      description: "The duration of the free trial."
+                externalProperties:
+                  type: object
+                  nullable: true
+                  additionalProperties:
+                    type: string
+                  example:
+                    custom-attribute: "custom value"
+                appStoreProductIds:
+                  type: object
+                  nullable: true
+                  properties:
+                    apple:
+                      type: string
+                      example: product-id-apple-1010
+                    amazon:
+                      type: string
+                      example: product-id-amazon-1010
+                    android:
+                      type: string
+                      example: product-id-android-1010
+                    roku:
+                      type: string
+                      example: product-id-roku-1010
+                    samsung:
+                      type: string
+                      example: product-id-samsung-1010
+                    vizio:
+                      type: string
+                      example: product-id-vizio-1010
+                  description: "A map of app store product identifiers."
+                seasonGroupId:
+                  type: string
+                  format: uuid
+                  description: The unique identifier for a season group.
+                  example: 0bdb7589-762c-40bf-b501-a0f02b59d76d
+                giftable:
+                  type: boolean
+                  example: false
+      responses:
+        '200':
+          description: Offer updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        204:
+          description: No operation was made
+        '400':
+          description: Bad Request - The request was improperly formatted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found - The specified offer does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        412:
+          description: Precondition Failed - The request could not be processed because resource version passed in header does not match the resource version on the server.
+        '422':
+          description: Unprocessable entity - The specified offer localization cannot be updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /offers/{offerID}/localizations:
+    post:
+      summary: Create new localization
+      tags:
+        - Offers
+      description: Create new localization
+      parameters:
+        - name: offerID
+          in: path
+          required: true
+          description: The unique identifier of the offer to be updated.
+          schema:
+            $ref: "#/components/schemas/mainOfferId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: A JSON object containing the fields to update on the offer.
+              type: object
+              additionalProperties: false
+              properties:
+                title:
+                  type: string
+                  example: Premium+
+                  minLength: 1
+                  maxLength: 255
+                description:
+                  type: string
+                  example: Best deal!
+                  maxLength: 255
+                countryCode:
+                  $ref: "#/components/schemas/CountryCode"
+                price:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    amount:
+                      type: number
+                      format: float
+                      description: The default price for the offer localization.
+                      example: 10
+                      minimum: 0
+                    currency:
+                      $ref: "#/components/schemas/CurrencyCode"
+                    rules:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          from:
+                            type: integer
+                            format: int64
+                            description: The start date of the pricing rule (Unix timestamp).
+                            example: 1764590400
+                          to:
+                            type: integer
+                            format: int64
+                            description: The end date of the pricing rule (Unix timestamp).
+                            example: 1777636800
+                          name:
+                            type: string
+                            description: The name of the pricing rule.
+                            example: Early Bird
+                          amount:
+                            type: number
+                            format: float
+                            description: The price for this specific rule.
+                            example: 5
+                            exclusiveMinimum: 0
+                        required:
+                          - from
+                          - to
+                          - name
+                          - amount
+                  required:
+                    - amount
+                    - currency
+                geoRestriction:
+                  type: object
+                  nullable: true
+                  properties:
+                    type:
+                      type: string
+                      enum: [ whitelist, blacklist ]
+                      example: "whitelist"
+                      description: "The type of geo-restriction."
+                    countries:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/CountryCode"
+                      example: [ "NL" ]
+                      description: "A list of country codes (ISO 3166-1 alpha-2)."
+                  required:
+                    - type
+                    - countries
+                freeTrial:
+                  type: object
+                  nullable: true
+                  properties:
+                    type:
+                      type: string
+                      enum: [ day, period ]
+                      example: day
+                      description: "The unit of the free trial duration."
+                    duration:
+                      type: integer
+                      minimum: 0
+                      example: 7
+                      description: "The duration of the free trial."
+                  required:
+                    - type
+                    - duration
+              required:
+                - title
+                - countryCode
+                - price
+      responses:
+        '200':
+          description: Localization created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        '400':
+          description: Bad Request - The request was improperly formatted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found - The specified offer does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        412:
+          description: Precondition Failed - The request could not be processed because resource version passed in header does not match the resource version on the server.
+        '422':
+          description: Unprocessable entity - The specified offer localization cannot be created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /offers/{offerID}/localizations/{countryCode}:
+    patch:
+      summary: Update an offer localization
+      tags:
+        - Offers
+      description: Updates specific fields of an existing offer localization.
+      parameters:
+        - name: offerID
+          in: path
+          required: true
+          description: The unique identifier of the offer.
+          schema:
+            $ref: "#/components/schemas/mainOfferId"
+        - name: countryCode
+          in: path
+          required: true
+          description: Localization country code
+          schema:
+            $ref: "#/components/schemas/CountryCode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: A JSON object containing the fields to update on the offer localization.
+              type: object
+              additionalProperties: false
+              minItems: 1
+              properties:
+                title:
+                  type: string
+                  example: Premium+
+                  minLength: 1
+                  maxLength: 255
+                description:
+                  type: string
+                  example: Best deal!
+                  maxLength: 255
+                price:
+                  type: object
+                  minItems: 1
+                  additionalProperties: false
+                  properties:
+                    amount:
+                      type: number
+                      format: float
+                      description: The default price for the offer localization.
+                      example: 10
+                      minimum: 0
+                    rules:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          from:
+                            type: integer
+                            format: int64
+                            description: The start date of the pricing rule (Unix timestamp).
+                            example: 1764590400
+                          to:
+                            type: integer
+                            format: int64
+                            description: The end date of the pricing rule (Unix timestamp).
+                            example: 1777636800
+                          name:
+                            type: string
+                            description: The name of the pricing rule.
+                            example: Early Bird
+                          amount:
+                            type: number
+                            format: float
+                            description: The price for this specific rule.
+                            example: 5
+                            exclusiveMinimum: 0
+                        required:
+                          - from
+                          - to
+                          - name
+                          - amount
+                geoRestriction:
+                  type: object
+                  nullable: true
+                  minItems: 1
+                  properties:
+                    type:
+                      type: string
+                      enum: [ whitelist, blacklist ]
+                      example: "whitelist"
+                      description: "The type of geo-restriction."
+                    countries:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/CountryCode"
+                      example: [ "NL" ]
+                      description: "A list of country codes (ISO 3166-1 alpha-2)."
+                freeTrial:
+                  type: object
+                  minItems: 1
+                  nullable: true
+                  properties:
+                    type:
+                      type: string
+                      enum: [ day, period ]
+                      example: day
+                      description: "The unit of the free trial duration."
+                    duration:
+                      type: integer
+                      minimum: 0
+                      example: 7
+                      description: "The duration of the free trial."
+      responses:
+        '200':
+          description: Offer updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        204:
+          description: No operation was made
+        '400':
+          description: Bad Request - The request was improperly formatted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not Found - The specified offer or localization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        412:
+          description: Precondition Failed - The request could not be processed because resource version passed in header does not match the resource version on the server.
+        '422':
+          description: Unprocessable entity - The specified offer localization cannot be updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /offers/{offerId}/activate:
+    post:
+      tags:
+        - Offers
+      parameters:
+        - in: path
+          name: offerId
+          required: true
+          schema:
+            $ref: "#/components/schemas/mainOfferId"
+      responses:
+        200:
+          description: Offer activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        204:
+          description: No operation was made
+        400:
+          description: Invalid OfferId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        412:
+          description: Precondition Failed - The request could not be processed because resource version passed in header does not match the resource version on the server.
+        404:
+          description: Offer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /offers/{offerId}/deactivate:
+    post:
+      tags:
+        - Offers
+      parameters:
+        - in: path
+          name: offerId
+          required: true
+          schema:
+            $ref: "#/components/schemas/mainOfferId"
+      responses:
+        200:
+          description: Offer deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        204:
+          description: No operation was made
+        400:
+          description: Invalid OfferId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Offer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        412:
+          description: Precondition Failed - The request could not be processed because resource version passed in header does not match the resource version on the server.
+
+  /offers/{offerId}/localizations/{countryCode}/activate:
+    post:
+      tags:
+        - Offers
+      parameters:
+        - in: path
+          name: offerId
+          required: true
+          schema:
+            $ref: "#/components/schemas/mainOfferId"
+        - in: path
+          name: countryCode
+          required: true
+          schema:
+            $ref: "#/components/schemas/CountryCode"
+      responses:
+        200:
+          description: Localization activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        204:
+          description: No operation was made
+        400:
+          description: Invalid OfferId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Offer or Localization not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        412:
+          description: Precondition Failed - The request could not be processed because resource version passed in header does not match the resource version on the server.
+        422:
+          description: Cannot activate localization of an inactive offer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /offers/{offerId}/localizations/{countryCode}/deactivate:
+    post:
+      tags:
+        - Offers
+      parameters:
+        - in: path
+          name: offerId
+          required: true
+          schema:
+            $ref: "#/components/schemas/mainOfferId"
+        - in: path
+          name: countryCode
+          required: true
+          schema:
+            $ref: "#/components/schemas/CountryCode"
+      responses:
+        200:
+          description: Localization deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        204:
+          description: No operation was made
+        400:
+          description: Invalid OfferId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Offer or Localization not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        412:
+          description: Precondition Failed - The request could not be processed because resource version passed in header does not match the resource version on the server.
+
+  /offers/season-groups:
+    get:
+      tags:
+        - Offers
+      summary: List season groups
+      responses:
+        200:
+          description: Successful retrieval of season groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SeasonGroupResource'
+    post:
+      tags:
+        - Offers
+      summary: Create a new season group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Name of the season group
+                  minLength: 1
+                  maxLength: 100
+              required:
+                - name
+      responses:
+        200:
+          description: Season group successfully created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonGroupResource'
+        400:
+          description: Bad request - validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Unprocessable entity - business validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                alreadyExists:
+                  value:
+                    message: "Season group 'NFL' already exists"
+
+  /offers/season-groups/{id}:
+    get:
+      tags:
+        - Offers
+      summary: Get a specific season group
+      description: Retrieves season group resource by ID
+      operationId: getSeasonGroup
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Season group ID
+      responses:
+        200:
+          description: Successful retrieval of season group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonGroupResource'
+        400:
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Season group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+        - Offers
+      summary: Update season group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Season group ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Name of the season group
+                  minLength: 1
+                  maxLength: 100
+              required:
+                - name
+      responses:
+        200:
+          description: Season group successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonGroupResource'
+        400:
+          description: Bad request - Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Season group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        422:
+          description: Unprocessable entity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+        - Offers
+      summary: Delete a season group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Season group ID to delete
+      responses:
+        200:
+          description: Season group successfully deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Season group deleted"
+        400:
+          description: Bad request - validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                validationError:
+                  value:
+                    message: "Parameter 'id' has invalid value"
+        404:
+          description: Season group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                notFound:
+                  value:
+                    message: "Season group not found"
+        422:
+          description: Unprocessable entity - business validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                hasActiveSeasons:
+                  value:
+                    message: "Cannot delete season group with active seasons"
+
+
+  /offers/season-groups/{id}/seasons:
+    post:
+      tags:
+        - Offers
+      summary: Add a season to a season group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Season group ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                startDate:
+                  type: integer
+                  description: Start date of the season as a Unix timestamp
+                  format: timestamp
+                  example: 1735814249
+                endDate:
+                  type: integer
+                  description: End date of the season as a Unix timestamp
+                  format: timestamp
+                  example: 1735844249
+              required:
+                - startDate
+                - endDate
+      responses:
+        200:
+          description: Season successfully added to the season group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonGroupResource'
+        400:
+          description: Bad request - input validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Season group not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                notFound:
+                  value:
+                    message: "Season group not found"
+        422:
+          description: Unprocessable entity - business validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                upcomingSeasonError:
+                  value:
+                    message: "Upcoming season can't start in less than 31 days"
+
+  /offers/season-groups/{id}/seasons/{seasonId}:
+    patch:
+      tags:
+        - Offers
+      summary: Update a season within a season group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Season group ID
+        - $ref: '#/components/parameters/seasonIdInPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                startDate:
+                  type: integer
+                  description: New start date of the season as a Unix timestamp
+                  format: timestamp
+                  example: 1735814249
+                endDate:
+                  type: integer
+                  description: New end date of the season as a Unix timestamp
+                  format: timestamp
+                  example: 1735844249
+              required:
+                - startDate
+                - endDate
+      responses:
+        200:
+          description: Season successfully updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonGroupResource'
+        400:
+          description: Bad request - input validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                validationError:
+                  value:
+                    message: "Input validation failed"
+        404:
+          description: Season group or season not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                seasonNotFound:
+                  value:
+                    message: "Season with id 3 does not exists"
+                groupNotFound:
+                  value:
+                    message: "Season group not found"
+        422:
+          description: Unprocessable entity - business validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                pastDatesError:
+                  value:
+                    message: "Only dates in future can be edited"
+    delete:
+      tags:
+        - Offers
+      summary: Delete a season from a season group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Season group ID
+        - $ref: '#/components/parameters/seasonIdInPath'
+      responses:
+        200:
+          description: Season successfully deleted from the season group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeasonGroupResource'
+        400:
+          description: Bad request - input validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        404:
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                notFound:
+                  value:
+                    message: "Season group not found"
+        422:
+          description: Unprocessable entity - business validation errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                notLastSeason:
+                  value:
+                    message: "Only last season can be removed"
+
+security:
+  - PublisherToken: [ ]
+  - InternalJWTAuth: [ ]
+  - LegacyInternalJWTAuth: [ ]
+
+components:
+  securitySchemes:
+    PublisherToken:
+      type: apiKey
+      in: header
+      name: X-Publisher-Token
+    InternalJWTAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    LegacyInternalJWTAuth:
+      type: apiKey
+      in: header
+      name: X-Request-Signature
+  parameters:
+    paymentDetailsId:
+      in: path
+      name: paymentDetailsId
+      required: true
+      schema:
+        type: integer
+        minimum: 100000000
+        maximum: 999999999
+      description: User payment details id
+    couponCode:
+      in: query
+      name: couponCode
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 40
+      description: Coupon code
+    giftId:
+      in: path
+      name: giftId
+      required: true
+      schema:
+        type: integer
+        minimum: 100000000
+        maximum: 999999999
+      description: Gift ID
+    giftCode:
+      in: path
+      name: code
+      required: true
+      schema:
+        type: string
+        pattern: ^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$
+      description: Gift Code
+    customerIp:
+      in: query
+      name: customerIp
+      required: true
+      schema:
+        type: string
+        pattern: ^(\d{1,3}\.){3}\d{1,3}$|^([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$
+      description: Customer IP
+    customerId:
+      in: path
+      name: customerId
+      required: true
+      schema:
+        type: integer
+        minimum: 100000000
+        maximum: 999999999
+      description: Customer ID
+    redeemerId:
+      in: query
+      name: redeemerId
+      required: true
+      schema:
+        type: integer
+      description: User Id of redeemer
+    seasonIdInPath:
+      in: path
+      name: seasonId
+      required: true
+      schema:
+        minimum: 1
+        type: integer
+      description: Season ID
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    offerId:
+      type: string
+      pattern: '^[SPEAR]{1}[1-9]\d{8}_[A-Z]{2}$'
+    mainOfferId:
+      type: string
+      pattern: '^[SPEAR]{1}[1-9]\d{8}$'
+      description: "The unique identifier for the offer."
+    subscriptionId:
+      type: integer
+      minimum: 100000000
+      maximum: 1999999999
+    passId:
+      type: integer
+      minimum: 100000000
+      maximum: 9999999999
+    customerId:
+      type: integer
+      minimum: 100000000
+      maximum: 9999999999
+    customerIp:
+      type: string
+      pattern: ^(\d{1,3}\.){3}\d{1,3}$|^([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$
+    redeemerId:
+      type: integer
+    SwitchResource:
+      type: object
+      properties:
+        id:
+          type: string
+        customerId:
+          $ref: '#/components/schemas/customerId'
+        direction:
+          $ref: '#/components/schemas/SwitchDirection'
+        algorithm:
+          type: string
+        fromOfferId:
+          $ref: '#/components/schemas/offerId'
+        toOfferId:
+          $ref: '#/components/schemas/offerId'
+        subscriptionId:
+          $ref: '#/components/schemas/subscriptionId'
+        status:
+          type: string
+          enum: [ inprogress, finished, cancelled, failed, pending ]
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+    SwitchDirection:
+      type: string
+      enum: [ upgrade, downgrade ]
+
+    Gift:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 186458507
+        code:
+          type: string
+          example: 1A2B-3C4D
+          minLength: 9
+          maxLength: 9
+        offerId:
+          type: string
+          example: S123123123_US
+        deliveryDetails:
+          $ref: '#/components/schemas/Gift_DeliveryDetails'
+        sentAt:
+          type: integer
+          nullable: true
+        redeemedAt:
+          type: integer
+          nullable: true
+    Gift_DeliveryDetails:
+      type: object
+      properties:
+        recipientEmail:
+          type: string
+          example: recipient@example.com
+          nullable: true
+        personalNote:
+          type: string
+          maxLength: 255
+          example: Happy birthday!
+          nullable: true
+        deliveryDate:
+          type: integer
+          example: 1689685427
+          description: UNIX Timestamp
+          nullable: true
+      required:
+        - recipientEmail
+        - personalNote
+        - deliveryDate
+    PaymentDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              minimum: 100000000
+              maximum: 999999999
+              nullable: true
+            customerId:
+              type: integer
+              minimum: 100000000
+              maximum: 999999999
+            token:
+              type: string
+              nullable: true
+            paymentGateway:
+              type: string
+            paymentMethod:
+              type: string
+            paymentMethodSpecificParams:
+              type: object
+            paymentMethodId:
+              type: integer
+              nullable: true
+            active:
+              type: boolean
+            bound:
+              type: boolean
+            subscriptionIds:
+              type: array
+              items:
+                type: integer
+            attemptRestrictions:
+              type: object
+              properties:
+                attemptRestrictedTo:
+                  type: integer
+                  nullable: true
+                attemptRejections:
+                  type: object
+                  additionalProperties:
+                    type: integer
+              required:
+                - attemptRejections
+                - attemptRestrictedTo
+          additionalProperties: false
+          required:
+            - id
+            - customerId
+            - token
+            - paymentGateway
+            - paymentMethod
+            - paymentMethodSpecificParams
+            - paymentMethodId
+            - active
+            - bound
+            - subscriptionIds
+      required:
+        - success
+        - message
+        - data
+    ListCampaignsResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              discount:
+                type: number
+              usagePerCoupon:
+                type: string
+              status:
+                type: string
+              constraints:
+                type: object
+                properties:
+                  offerTypes:
+                    type: array
+                    items:
+                      type: string
+                  paymentType:
+                    type: string
+                  offers:
+                    type: array
+                    items:
+                      type: string
+                  tags:
+                    type: array
+                    items:
+                      type: string
+                required:
+                  - offerTypes
+                  - paymentType
+                  - offers
+                  - tags
+            additionalProperties: false
+            required:
+              - name
+              - discount
+              - usagePerCoupon
+              - status
+              - constraints
+      required:
+        - data
+    SubscriptionResource:
+      type: object
+      nullable: true
+      properties:
+        subscriptionId:
+          $ref: '#/components/schemas/subscriptionId'
+        paymentDetailsId:
+          type: integer
+          minimum: 100000000
+          maximum: 999999999
+          nullable: true
+        publisherId:
+          type: integer
+          minimum: 100000000
+          maximum: 999999999
+        customerId:
+          type: integer
+          minimum: 100000000
+          maximum: 999999999
+        status:
+          type: string
+          enum:
+            - active
+            - stopped
+            - terminated
+            - paused
+        dateFrom:
+          type: integer
+          format: timestamp
+          minimum: 1
+        dateTo:
+          type: integer
+          format: timestamp
+          minimum: 1
+        nextPaymentAction:
+          type: string
+          enum:
+            - capture
+            - authorise
+        nextPaymentActionDate:
+          type: integer
+          format: timestamp
+          minimum: 1
+        subscriptionExternalId:
+          type: string
+          nullable: true
+          default: null
+        offerId:
+          type: string
+        paymentCountry:
+          type: string
+        ipAddress:
+          type: string
+          format: ip
+          nullable: true
+        inTrial:
+          type: boolean
+        couponCode:
+          type: string
+          nullable: true
+        coupon:
+          type: object
+          deprecated: true
+          properties:
+            discountRate:
+              type: number
+              format: decimal
+            usageLeft:
+              type: integer
+              minimum: 0
+        pendingSwitchId:
+          type: string
+          format: uuid
+          nullable: true
+        externalProperties:
+          type: object
+        paymentMethodId:
+          type: integer
+          nullable: true
+        isExternallyManaged:
+          type: boolean
+        id:
+          type: integer
+          minimum: 100000000
+          maximum: 999999999
+          deprecated: true
+        userId:
+          type: integer
+          minimum: 100000000
+          maximum: 999999999
+          deprecated: true
+        latestPaymentExternalId:
+          type: string
+        paymentGateway:
+          type: string
+          deprecated: true
+        replacedBy:
+          type: object
+          nullable: true
+          properties:
+            subscriptionId:
+              $ref: '#/components/schemas/subscriptionId'
+            reason:
+              type: string
+            date:
+              type: integer
+        originatedFrom:
+          type: object
+          nullable: true
+          properties:
+            subscriptionId:
+              $ref: '#/components/schemas/subscriptionId'
+            reason:
+              type: string
+            date:
+              type: integer
+        renewalCycle:
+          type: object
+          nullable: true
+          properties:
+            completed:
+              type: integer
+              minimum: 0
+            unit:
+              type: string
+              enum: [ day, week, month, year, season ]
+            amount:
+              type: integer
+              minimum: 1
+        source:
+          type: string
+          nullable: true
+        pause:
+          type: object
+          nullable: true
+          properties:
+            requestedAt:
+              type: integer
+              format: timestamp
+              minimum: 1
+            pauseDate:
+              type: integer
+              format: timestamp
+              minimum: 1
+            resumeDate:
+              type: integer
+              format: timestamp
+              minimum: 1
+            failedResumes:
+              type: array
+              items:
+                type: integer
+                format: timestamp
+                minimum: 1
+
+    SubscriptionFailureResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        subscription:
+          type: object
+          nullable: true
+          default: null
+        message:
+          type: string
+
+    PassResource:
+      type: object
+      nullable: true
+      additionalProperties: false
+      properties:
+        passId:
+          $ref: '#/components/schemas/passId'
+        customerId:
+          type: integer
+          minimum: 100000000
+          maximum: 999999999
+        status:
+          type: string
+          enum:
+            - active
+            - stopped
+            - terminated
+        expiresAt:
+          type: integer
+          nullable: true
+          format: timestamp
+          minimum: 1
+        offerId:
+          type: string
+        externalId:
+          type: string
+          nullable: true
+          default: null
+        externalProperties:
+          type: object
+        paymentMethodId:
+          type: integer
+          nullable: true
+        isExternallyManaged:
+          type: boolean
+        replacedBy:
+          type: object
+          nullable: true
+          required: [ passId, reason, date ]
+          properties:
+            passId:
+              $ref: '#/components/schemas/passId'
+            reason:
+              type: string
+            date:
+              type: integer
+        originatedFrom:
+          type: object
+          nullable: true
+          required: [ passId, reason, date ]
+          properties:
+            passId:
+              $ref: '#/components/schemas/passId'
+            reason:
+              type: string
+            date:
+              type: integer
+        source:
+          type: string
+          nullable: true
+
+    CustomerResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/CustomerResource'
+      required:
+        - success
+        - message
+        - data
+
+    CustomerResource:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/customerId'
+        email:
+          type: string
+          format: email
+        country:
+          $ref: '#/components/schemas/CountryCode'
+        regDate:
+          type: string
+        lastLoginDate:
+          type: string
+          nullable: true
+        lastUserIp:
+          type: string
+          format: ipv4, ipv6
+          nullable: true
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        locale:
+          type: string
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        externalId:
+          type: string
+          nullable: true
+        externalData:
+          type: object
+          nullable: true
+
+    GiftVerificationResponseResource:
+      type: object
+      properties:
+        redeemable:
+          type: boolean
+          example: true
+        redeemMode:
+          type: string
+          example: EXTEND
+          nullable: true
+        redeemRefusalReason:
+          type: string
+          example: null
+          nullable: true
+        extendedSubscriptionId:
+          type: integer
+          example: 123456789
+          nullable: true
+        offerId:
+          type: string
+          example: S987654321_PL
+          nullable: true
+    PaymentResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum:
+            - authorized
+            - captured
+            - rejected
+            - refunded
+            - cancelled
+            - receivable
+            - temporary
+        totalAmount:
+          type: number
+          format: float
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        customerId:
+          type: integer
+          minimum: 100000000
+          maximum: 999999999
+        paymentGateway:
+          type: string
+        paymentMethod:
+          type: string
+        externalPaymentId:
+          type: string
+          nullable: true
+        couponCodeId:
+          type: integer
+          nullable: true
+        amount:
+          type: number
+          format: float
+        country:
+          type: string
+        offerType:
+          type: string
+        offerId:
+          $ref: '#/components/schemas/offerId'
+        taxValue:
+          type: number
+          format: float
+          nullable: true
+        paymentMethodFee:
+          type: number
+          format: float
+        customerServiceFee:
+          type: number
+          format: float
+          nullable: true
+        rejectedReason:
+          type: string
+          nullable: true
+        refundedReason:
+          type: string
+          nullable: true
+        paymentDetailsId:
+          type: integer
+          nullable: true
+        paymentOperation:
+          type: string
+          enum:
+            - initial-payment
+            - payment-details-modification
+            - recurring-payment
+            - refund-payment
+            - chargeback-payment
+            - cancel-payment
+            - offer-switch
+          nullable: true
+        gatewaySpecificParams:
+          type: object
+    PaymentMethodResource:
+      properties:
+        id:
+          type: integer
+        source:
+          type: string
+          nullable: false
+          minLength: 1
+        methodName:
+          type: string
+          nullable: false
+          minLength: 1
+        paymentGateway:
+          type: string
+          nullable: false
+          minLength: 1
+        feeRate:
+          type: number
+          format: double
+          nullable: false
+          default: 0.0
+        isExternalPayment:
+          type: boolean
+          nullable: false
+        handler:
+          type: string
+          nullable: false
+          minLength: 1
+          default: external
+        gatewayParameters:
+          type: array
+          nullable: true
+          default: null
+        paymentSupport:
+          type: boolean
+          nullable: false
+        paymentAmountAccuracy:
+          type: boolean
+          nullable: false
+        autoTerminate:
+          type: boolean
+          default: true
+          nullable: false
+    Offer:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/mainOfferId"
+        longId:
+          $ref: "#/components/schemas/offerId"
+        type:
+          type: string
+          enum:
+            - vod
+            - live
+            - subscription
+            - pass
+        tags:
+          $ref: "#/components/schemas/OfferTags"
+        active:
+          type: boolean
+          example: false
+          description: "Indicates if the offer is currently active."
+        title:
+          type: string
+          description: "The title of the offer."
+        description:
+          type: string
+          example: "Description of test subscription"
+          description: "A description of the offer."
+        url:
+          type: string
+          example: "https://example-url.com"
+          description: "A URL associated with the offer."
+        imageUrl:
+          type: string
+          description: "A URL for an image representing the offer."
+        createdAt:
+          type: integer
+          format: int64
+          example: 1750163810
+          description: "The timestamp when the offer was created (Unix epoch time)."
+        updatedAt:
+          type: integer
+          format: int64
+          example: 1750163810
+          description: "The timestamp when the offer was last updated (Unix epoch time)."
+        hasLandingPage:
+          type: boolean
+          example: false
+          description: "Indicates if the offer has a dedicated landing page."
+        sessionsLimit:
+          type: integer
+          nullable: true
+          example: 10
+          description: "The limit on the number of sessions for this offer."
+        price:
+          $ref: '#/components/schemas/Price'
+        externalProperties:
+          $ref: '#/components/schemas/ExternalProperties'
+        appStoreProductIds:
+          $ref: '#/components/schemas/AppStoreProductIds'
+        giftable:
+          type: boolean
+          example: false
+          description: "Indicates if the offer can be purchased as a gift."
+        localizations:
+          type: array
+          items:
+            $ref: '#/components/schemas/OfferLocalization'
+        pause:
+          type: object
+          nullable: true
+          description: "Information regarding a paused subscription. Structure is not defined in the example."
+          properties:
+            maxBillingCycles:
+              type: integer
+              description: "Maximal amount of billing cycles a subscription can be paused."
+        seasonGroupId:
+          type: string
+          format: uuid
+          description: The unique identifier for a season group in seasonal offer.
+          example: 0bdb7589-762c-40bf-b501-a0f02b59d76d
+        geoRestriction:
+          $ref: '#/components/schemas/GeoRestriction'
+        event:
+          $ref: '#/components/schemas/Event'
+        freeTrial:
+          $ref: '#/components/schemas/FreeTrial'
+        billingCycle:
+          $ref: '#/components/schemas/BillingCycle'
+        entitlement:
+          $ref: '#/components/schemas/Entitlement'
+        version:
+          type: integer
+          example: 1
+
+    OfferTags:
+      type: array
+      description: A list of unique tags to categorize the offer.
+      uniqueItems: true
+      items:
+        type: string
+        description: A tag containing letters, numbers, spaces, and the characters _-:.
+        maxLength: 64
+        pattern: '^[a-zA-Z0-9_\-: ]+$'
+        example: 'live-event:2025'
+      example: [ 'sport', 'featured event' ]
+    Price:
+      type: object
+      additionalProperties: false
+      properties:
+        amount:
+          type: number
+          format: double
+          nullable: false
+          example: 5.99
+          description: "The price amount."
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        taxIncluded:
+          type: boolean
+          example: true
+          description: "Indicates if tax is included in the price."
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceRule'
+      required:
+        - amount
+        - currency
+        - taxIncluded
+
+    PriceRule:
+      type: object
+      additionalProperties: false
+      properties:
+        from:
+          type: integer
+          format: int64
+          example: 1750163810
+          description: "The start timestamp for the price rule (Unix epoch time)."
+        to:
+          type: integer
+          format: int64
+          example: 1750163810
+          description: "The end timestamp for the price rule (Unix epoch time)."
+        amount:
+          type: number
+          format: double
+          example: 10.99
+          description: "The price amount for this rule."
+        name:
+          type: string
+          example: "Early Bird"
+          description: "The name of the price rule."
+      required:
+        - from
+        - to
+        - amount
+        - name
+
+    ExternalProperties:
+      type: object
+      additionalProperties:
+        type: string
+      example:
+        custom-attribute: "custom value"
+      description: "A key-value map for custom attributes."
+
+    AppStoreProductIds:
+      type: object
+      additionalProperties: false
+      properties:
+        apple:
+          type: string
+          example: product-id-apple-1010
+        amazon:
+          type: string
+          example: product-id-amazon-1010
+        android:
+          type: string
+          example: product-id-android-1010
+        roku:
+          type: string
+          example: product-id-roku-1010
+        samsung:
+          type: string
+          example: product-id-samsung-1010
+        vizio:
+          type: string
+          example: product-id-vizio-1010
+      description: "A map of app store product identifiers."
+
+    OfferLocalization:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          $ref: "#/components/schemas/offerId"
+        title:
+          type: string
+          example: "Test subscription"
+          description: "The localized title."
+        description:
+          type: string
+          example: "Test subscription description"
+          description: "The localized description."
+        price:
+          $ref: '#/components/schemas/Price'
+        active:
+          type: boolean
+          example: true
+          description: "Indicates if the localization is active."
+        countryCode:
+          $ref: "#/components/schemas/CountryCode"
+        geoRestriction:
+          $ref: '#/components/schemas/GeoRestriction'
+        freeTrial:
+          $ref: '#/components/schemas/FreeTrial'
+      required:
+        - id
+        - title
+        - description
+        - price
+        - active
+        - countryCode
+
+    GeoRestriction:
+      type: object
+      nullable: true
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [ whitelist, blacklist ]
+          example: "whitelist"
+          description: "The type of geo-restriction."
+        countries:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountryCode"
+          example: [ "NL" ]
+          description: "A list of country codes (ISO 3166-1 alpha-2)."
+      required:
+        - type
+        - countries
+
+    CurrencyCode:
+      type: string
+      pattern: '^[A-Z]{3}$'
+      example: "EUR"
+      description: "The currency as ISO 4217 code."
+
+    CountryCode:
+      type: string
+      minLength: 2
+      maxLength: 2
+      example: "PL"
+      description: "The country code for this localization (ISO 3166-1 alpha-2)."
+
+    Event:
+      type: object
+      additionalProperties: false
+      properties:
+        startsAt:
+          type: integer
+          format: int64
+          example: 1750163810
+          description: "The start timestamp of the event (Unix epoch time)."
+        endsAt:
+          type: integer
+          format: int64
+          example: 1750163810
+          description: "The end timestamp of the event (Unix epoch time)."
+        timezone:
+          type: string
+          example: "Europe/Berlin"
+          description: "The timezone of the event."
+      required:
+        - startsAt
+        - endsAt
+        - timezone
+
+    FreeTrial:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [ day, period ]
+          example: day
+          description: "The unit of the free trial duration."
+        duration:
+          type: integer
+          minimum: 0
+          example: 7
+          description: "The duration of the free trial."
+      required:
+        - type
+        - duration
+
+    BillingCycle:
+      type: object
+      additionalProperties: false
+      properties:
+        periodUnit:
+          type: string
+          enum: [ day, week, month, year, season ]
+          example: "month"
+          description: "The unit of the billing cycle period."
+        amount:
+          type: integer
+          example: 1
+          description: "The number of period units in one billing cycle."
+      required:
+        - periodUnit
+        - amount
+
+    Entitlement:
+      type: object
+      additionalProperties: false
+      properties:
+        expirationPolicy:
+          type: string
+          enum: [ "fixed-date", "duration" ]
+          example: "fixed-date"
+          description: "The policy for entitlement expiration."
+        expiresAt:
+          type: integer
+          format: int64
+          example: 1750163810
+          description: "The timestamp when the entitlement expires (Unix epoch time)."
+        duration:
+          type: object
+          properties:
+            periodUnit:
+              type: string
+              enum: [hour, day, week, month, year]
+            amount:
+              type: integer
+
+      required:
+        - expirationPolicy
+
+    SeasonGroupResource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the season group
+          example: 0bdb7589-762c-40bf-b501-a0f02b59d76d
+        name:
+          type: string
+          description: Name of the season group
+        seasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/Season'
+      required:
+        - id
+        - name
+        - seasons
+
+    Season:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the season
+          example: 1
+        startDate:
+          type: integer
+          format: timestamp
+          example: 1750163810
+          description: Start date and time of the season
+        endDate:
+          type: integer
+          format: timestamp
+          example: 1750163810
+          description: End date and time of the season
+      required:
+        - id
+        - startDate
+        - endDate
