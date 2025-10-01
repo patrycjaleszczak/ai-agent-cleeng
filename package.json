@@ -1,0 +1,30 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "pretest": "node -e \"try{require('fs').statSync('tests/api/generated')}catch(e){process.exit(0)}\"",
+    "test": "playwright test",
+    "gen:api": "npx ts-node --transpile-only scripts/generate-api-tests.ts",
+    "test:api": "PW_BASE_URL=$PW_BASE_URL BASE_URL=$BASE_URL AUTH_HEADER=\"$AUTH_HEADER\" npx playwright test tests/api/generated"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/patrycjaleszczak/ai-agent-cleeng.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/patrycjaleszczak/ai-agent-cleeng/issues"
+  },
+  "homepage": "https://github.com/patrycjaleszczak/ai-agent-cleeng#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "@types/node": "^24.6.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "yaml": "^2.8.1"
+  }
+}
