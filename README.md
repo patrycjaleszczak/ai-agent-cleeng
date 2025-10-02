@@ -32,3 +32,15 @@ npm test
 
 The tests perform basic 2xx/3xx assertions. Customize each generated file under `tests/api/generated` to add contract-specific checks.
 
+### Installing dependencies (node_modules)
+
+The `node_modules/` directory is not committed. To install dependencies locally:
+
+```bash
+npm ci
+# or
+npm install
+```
+
+This will recreate `node_modules/` based on `package.json` (and lockfile if present).
+
