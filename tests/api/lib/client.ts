@@ -7,8 +7,9 @@ export class ApiClient {
   private requestContext?: APIRequestContext;
 
   constructor(config: ApiClientConfig) {
-    this.baseURL = config.baseURL.replace(/\/$/, '');
-    this.authHeader = config.authHeader;
+    const base = config.baseURL || process.env.BASE_URL || process.env.PW_BASE_URL || 'http://localhost:3000';
+    this.baseURL = base.replace(/\/$/, '');
+    this.authHeader = config.authHeader ?? process.env.AUTH_HEADER;
   }
 
   async init(): Promise<void> {
