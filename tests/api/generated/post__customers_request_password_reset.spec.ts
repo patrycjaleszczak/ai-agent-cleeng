@@ -1,0 +1,18 @@
+import { test } from '@playwright/test';
+import { ApiClient } from '../../api/lib/client';
+import { expectStatusOk } from '../../api/lib/expect';
+
+test('POST /customers/request_password_reset', async () => {
+  const baseURL = process.env.BASE_URL || process.env.PW_BASE_URL || 'https://api.staging.stardustlab.com';
+  const client = new ApiClient({ baseURL, authHeader: process.env.AUTH_HEADER });
+  await client.init();
+  try {
+    const templatePath = '/customers/request_password_reset';
+    const resolvedPath = client.resolvePathParams(templatePath);
+    // TODO: Provide query/body if required by schema
+    const res = await client.send('POST', resolvedPath);
+    await expectStatusOk(res, 'POST /customers/request_password_reset');
+  } finally {
+    await client.dispose();
+  }
+});
