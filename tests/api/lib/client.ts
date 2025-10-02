@@ -7,7 +7,7 @@ export class ApiClient {
   private requestContext?: APIRequestContext;
 
   constructor(config: ApiClientConfig) {
-    const base = config.baseURL || process.env.BASE_URL || process.env.PW_BASE_URL || 'http://localhost:3000';
+    const base = config.baseURL || process.env.BASE_URL || process.env.PW_BASE_URL || 'https://api.staging.stardustlab.com';
     this.baseURL = base.replace(/\/$/, '');
     this.authHeader = config.authHeader ?? process.env.AUTH_HEADER;
   }
