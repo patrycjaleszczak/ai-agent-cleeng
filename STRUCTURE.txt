@@ -1,0 +1,57 @@
+Nespresso Playwright Test Automation Project Structure
+========================================================
+
+/workspace/
+│
+├── Configuration Files
+│   ├── package.json                    # Dependencies and scripts
+│   ├── playwright.config.ts           # Playwright configuration
+│   ├── tsconfig.json                  # TypeScript configuration
+│   └── .gitignore                     # Git ignore rules
+│
+├── Page Objects (POM)
+│   └── pages/
+│       ├── BasePage.ts                # Base page with common functionality
+│       ├── HomePage.ts                # Home page object
+│       ├── CoffeePLPPage.ts          # Coffee Product Listing Page
+│       └── CoffeePDPPage.ts          # Coffee Product Details Page
+│
+├── Type Definitions
+│   └── types/
+│       ├── product.types.ts          # Product-related interfaces
+│       └── page.types.ts             # Page configuration types
+│
+├── Fixtures
+│   └── fixtures/
+│       └── pages.fixture.ts          # Page object fixtures
+│
+├── Test Specifications
+│   └── tests/
+│       └── coffee-browsing.spec.ts   # Coffee browsing test suite
+│
+└── Documentation
+    ├── README.md                      # Main project documentation
+    ├── TEST_DOCUMENTATION.md          # Detailed test documentation
+    ├── ENHANCED_EXPECTATIONS.md       # Enhanced validations summary
+    ├── PROJECT_SUMMARY.md             # Project overview
+    └── STRUCTURE.txt                  # This file
+
+Key Statistics:
+===============
+- Total Files: 14
+- Page Objects: 4 (BasePage + 3 pages)
+- Type Interfaces: 8+
+- Test Scenarios: 4
+- Validation Categories: 37+
+- Lines of Code: 2,500+
+- Documentation Files: 5
+- Supported Browsers: 5
+
+Quick Commands:
+===============
+npm install              # Install dependencies
+npx playwright install   # Install browsers
+npm test                 # Run tests
+npm run test:headed      # Run with browser visible
+npm run test:ui          # Run in UI mode
+npm run test:report      # View HTML report
